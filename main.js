@@ -332,12 +332,11 @@ function resetScanUpload() {
 
 async function performScan() {
   if (!state.scanImage) return;
-  const apiKey = CONFIG?.anthropic?.apiKey;
-  if (!apiKey || apiKey.includes('YOUR_')) { showToast('请先在 config.js 中配置 Anthropic API Key'); return; }
+  if (!aiReady()) { showToast('请先在 config.js 中配置硅基流动 API Key'); return; }
 
   showScanStep('loading');
   try {
-    const items = await callOCR(state.scanImage, state.scanMime, apiKey);
+    const items = await callOCR(state.scanImage, state.scanMime);
     if (!Array.isArray(items) || items.length === 0) {
       setScanError('未识别到商品，请确认图片为超市小票');
       return;
@@ -409,23 +408,22 @@ async function confirmImport() {
   }
 }
 
-// ══ Anthropic OCR ══════════════════════════════════════
-async function callOCR(base64, mime, apiKey) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+// ══ SiliconFlow OCR (vision) ══════════════════════════
+async function callOCR(base64, mime) {
+  const { baseUrl, visionModel } = CONFIG.ai;
+  const resp = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'Authorization': `Bearer ${aiKey()}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: visionModel,
       max_tokens: 2048,
       messages: [{
         role: 'user',
         content: [
-          { type: 'image', source: { type: 'base64', media_type: mime, data: base64 } },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
           { type: 'text', text: `解析超市小票，提取所有食品和日用杂货商品，返回 JSON 数组。
 字段：name（中文原文）、price（数字）、quantity（如"1个"）、category（蔬菜/水果/肉类/乳制品/调料/主食/其他）。
 只返回 JSON 数组，无其他文字；排除非商品（购物袋、积分等）；非小票图片返回 []。` },
@@ -438,7 +436,7 @@ async function callOCR(base64, mime, apiKey) {
     try { const e = await resp.json(); msg = e.error?.message || msg; } catch {}
     throw new Error(msg);
   }
-  return parseJsonArray((await resp.json()).content?.[0]?.text || '');
+  return parseJsonArray((await resp.json()).choices?.[0]?.message?.content || '');
 }
 
 // ══ Recipe Recommendations ════════════════════════════
@@ -461,8 +459,7 @@ async function getRecipes(force = false) {
   if (recipesLoading) return;
   if (!force && state.recipes) { renderRecipes(state.recipes); showRecipesState('result'); return; }
 
-  const apiKey = CONFIG?.anthropic?.apiKey;
-  if (!apiKey || apiKey.includes('YOUR_')) { showToast('请先配置 Anthropic API Key'); return; }
+  if (!aiReady()) { showToast('请先在 config.js 中配置硅基流动 API Key'); return; }
   if (state.items.length === 0) { showToast('冰箱是空的，请先添加食材'); return; }
 
   recipesLoading = true;
@@ -488,7 +485,7 @@ ${JSON.stringify(inventory, null, 2)}
 只返回如下 JSON 数组，无任何其他文字或 Markdown：
 [{"dishName":"","ingredientsUsed":[],"missingIngredients":[],"steps":[],"cookTime":"","difficulty":"简单"}]`;
 
-    const result = await callAnthropicChat(prompt, apiKey);
+    const result = await callAIChat(prompt);
     if (!Array.isArray(result) || !result.length) throw new Error('未能获取菜谱建议，请重试');
     state.recipes = result;
     renderRecipes(result);
@@ -563,8 +560,7 @@ async function getShopping(force = false) {
   if (shoppingLoading) return;
   if (!force && state.shoppingList) { renderShoppingList(state.shoppingList); showShoppingState('result'); return; }
 
-  const apiKey = CONFIG?.anthropic?.apiKey;
-  if (!apiKey || apiKey.includes('YOUR_')) { showToast('请先配置 Anthropic API Key'); return; }
+  if (!aiReady()) { showToast('请先在 config.js 中配置硅基流动 API Key'); return; }
 
   shoppingLoading = true;
   showShoppingState('loading');
@@ -600,7 +596,7 @@ reason 字段 ≤ 15 字，如"常买，已用完"、"近期缺乏蛋白质"。
 只返回 JSON 数组，无其他文字：
 [{"item":"","reason":"","category":"蔬菜/水果/肉类/乳制品/调料/主食/其他"}]`;
 
-    const result = await callAnthropicChat(prompt, apiKey);
+    const result = await callAIChat(prompt);
     if (!Array.isArray(result) || !result.length) throw new Error('未能获取建议，请重试');
     state.shoppingList = result;
     renderShoppingList(result);
@@ -634,18 +630,17 @@ function renderShoppingList(list) {
   }).join('');
 }
 
-// ══ Shared Anthropic Chat ══════════════════════════════
-async function callAnthropicChat(prompt, apiKey) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+// ══ Shared SiliconFlow Chat ═════════════════════════════
+async function callAIChat(prompt) {
+  const { baseUrl, textModel } = CONFIG.ai;
+  const resp = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'Authorization': `Bearer ${aiKey()}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: textModel,
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -655,7 +650,7 @@ async function callAnthropicChat(prompt, apiKey) {
     try { const e = await resp.json(); msg = e.error?.message || msg; } catch {}
     throw new Error(msg);
   }
-  return parseJsonArray((await resp.json()).content?.[0]?.text || '');
+  return parseJsonArray((await resp.json()).choices?.[0]?.message?.content || '');
 }
 
 function parseJsonArray(text) {
@@ -696,6 +691,8 @@ function isConfigured() {
     && CONFIG.supabase?.anonKey
     && !CONFIG.supabase.anonKey.includes('YOUR_');
 }
+function aiKey()    { return CONFIG?.ai?.apiKey  || ''; }
+function aiReady()  { return aiKey() && !aiKey().includes('YOUR_'); }
 
 // ══ Init ══════════════════════════════════════════════
 async function init() {
