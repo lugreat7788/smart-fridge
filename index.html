@@ -6,8 +6,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#ffffff">
   <title>冰箱管家</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -126,7 +124,7 @@
             </div>
           </div>
           <!-- Step: Loading -->
-          <div id="scan-step-loading" class="scan-step hidden">
+          <div id="scan-step-loading" class="scan-step">
             <div class="ai-loading-wrap">
               <div class="spinner-lg"></div>
               <p class="ai-loading-title">AI 正在识别小票...</p>
@@ -134,7 +132,7 @@
             </div>
           </div>
           <!-- Step: Review -->
-          <div id="scan-step-review" class="scan-step hidden">
+          <div id="scan-step-review" class="scan-step">
             <div class="review-header">
               <h3>识别到 <span id="scan-count" class="accent">0</span> 件商品</h3>
               <p class="review-sub">确认勾选后导入冰箱</p>
@@ -146,7 +144,7 @@
             </div>
           </div>
           <!-- Step: Error -->
-          <div id="scan-step-error" class="scan-step hidden">
+          <div id="scan-step-error" class="scan-step">
             <div class="ai-error-wrap">
               <div class="ai-error-icon">⚠️</div>
               <p id="scan-error-msg" class="ai-error-msg"></p>
@@ -297,8 +295,8 @@
 
 <input type="file" id="file-input" accept="image/*" style="display:none">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="main.js"></script>
+<script src="sdk/cloudbase.js"></script>
+<script src="config.js?v=5"></script>
+<script src="main.js?v=6"></script>
 </body>
 </html>

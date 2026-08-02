@@ -11,6 +11,81 @@ const CATEGORIES = {
   '其他':  { icon: '📦', expiry: 14 },
 };
 
+// ══ Item Emoji Map ════════════════════════════════════
+const ITEM_EMOJIS = {
+  '白菜':'🥬','大白菜':'🥬','卷心菜':'🥬','圆白菜':'🥬','包菜':'🥬',
+  '西红柿':'🍅','番茄':'🍅',
+  '土豆':'🥔','马铃薯':'🥔',
+  '胡萝卜':'🥕','萝卜':'🥕',
+  '黄瓜':'🥒','丝瓜':'🥒',
+  '茄子':'🍆',
+  '青椒':'🫑','甜椒':'🫑','辣椒':'🌶️',
+  '玉米':'🌽',
+  '洋葱':'🧅','大葱':'🧅','葱':'🧅',
+  '大蒜':'🧄','蒜':'🧄',
+  '菠菜':'🥬','生菜':'🥬','油菜':'🥬','韭菜':'🥬','芹菜':'🌿','香菜':'🌿',
+  '西兰花':'🥦','花椰菜':'🥦','菜花':'🥦',
+  '蘑菇':'🍄','香菇':'🍄','金针菇':'🍄','平菇':'🍄',
+  '南瓜':'🎃',
+  '豆腐':'🟡','豆芽':'🌱',
+  '苹果':'🍎','红富士':'🍎',
+  '香蕉':'🍌',
+  '橙子':'🍊','柑橘':'🍊','橘子':'🍊','柚子':'🍊',
+  '葡萄':'🍇',
+  '西瓜':'🍉',
+  '草莓':'🍓',
+  '桃子':'🍑','水蜜桃':'🍑',
+  '梨':'🍐','雪梨':'🍐',
+  '柠檬':'🍋',
+  '芒果':'🥭',
+  '菠萝':'🍍',
+  '椰子':'🥥',
+  '樱桃':'🍒',
+  '蓝莓':'🫐',
+  '猕猴桃':'🥝','奇异果':'🥝',
+  '火龙果':'🐉',
+  '荔枝':'🍈','龙眼':'🍈',
+  '猪肉':'🥩','五花肉':'🥩','排骨':'🥩','猪排':'🥩','里脊':'🥩','猪蹄':'🥩',
+  '牛肉':'🥩','牛排':'🥩','牛腩':'🥩',
+  '羊肉':'🥩','羊排':'🥩',
+  '鸡肉':'🍗','鸡腿':'🍗','鸡翅':'🍗','鸡胸':'🍗','鸡胸肉':'🍗',
+  '鸭肉':'🦆','鸭腿':'🦆',
+  '鱼':'🐟','鲫鱼':'🐟','草鱼':'🐟','鲈鱼':'🐟','三文鱼':'🐟','带鱼':'🐟','鲤鱼':'🐟',
+  '虾':'🦐','虾仁':'🦐','大虾':'🦐',
+  '螃蟹':'🦀','蟹':'🦀',
+  '鸡蛋':'🥚','蛋':'🥚','鸭蛋':'🥚','鹌鹑蛋':'🥚',
+  '牛奶':'🥛','奶':'🥛','纯牛奶':'🥛',
+  '酸奶':'🥛',
+  '奶酪':'🧀','芝士':'🧀',
+  '黄油':'🧈',
+  '大米':'🌾','米':'🌾','米饭':'🍚',
+  '面条':'🍜','挂面':'🍜','拉面':'🍜',
+  '面包':'🍞','吐司':'🍞',
+  '馒头':'🥐','包子':'🥟','饺子':'🥟',
+  '面粉':'🌾',
+  '盐':'🧂',
+  '酱油':'🫙','生抽':'🫙','老抽':'🫙',
+  '醋':'🫙',
+  '糖':'🍬','白糖':'🍬','红糖':'🍬',
+  '油':'🫙','花生油':'🫙','菜籽油':'🫙','橄榄油':'🫙','香油':'🫙',
+  '可乐':'🥤','雪碧':'🥤',
+  '果汁':'🧃',
+  '茶':'🍵','绿茶':'🍵','红茶':'🍵',
+  '咖啡':'☕',
+  '啤酒':'🍺',
+  '矿泉水':'💧','纯净水':'💧',
+};
+
+function getItemEmoji(name, category) {
+  if (!name) return catIcon(category);
+  // try full name, then each 2-char prefix
+  if (ITEM_EMOJIS[name]) return ITEM_EMOJIS[name];
+  for (const key of Object.keys(ITEM_EMOJIS)) {
+    if (name.includes(key)) return ITEM_EMOJIS[key];
+  }
+  return catIcon(category);
+}
+
 // ══ App State ═════════════════════════════════════════
 const state = {
   items:        [],
@@ -25,38 +100,57 @@ const state = {
   shoppingList: null,
 };
 
-// ══ Supabase DB Layer ═════════════════════════════════
-let sb; // supabase client (initialized in init)
+// ══ CloudBase DB Layer ════════════════════════════════
+let tcbDb; // CloudBase database instance (set in init)
+
+function tcbDocToObj(doc) {
+  return {
+    id:            doc._id,
+    name:          doc.name,
+    category:      doc.category,
+    quantity:      doc.quantity || '',
+    price:         doc.price || 0,
+    purchase_date: doc.purchase_date,
+    expiry_date:   doc.expiry_date,
+    status:        doc.status,
+    created_at:    doc.created_at,
+  };
+}
 
 const db = {
   async fetchItems() {
-    const { data, error } = await sb.from('food_items').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    const { data } = await tcbDb.collection('fridge')
+      .orderBy('created_at', 'desc').limit(1000).get();
+    return (data || []).map(tcbDocToObj);
   },
   async insertItem(payload) {
-    const { data, error } = await sb.from('food_items').insert([payload]).select().single();
-    if (error) throw error;
-    return data;
+    const doc = { ...payload, created_at: new Date().toISOString() };
+    const { id } = await tcbDb.collection('fridge').add(doc);
+    return { id, ...doc };
   },
   async updateItem(id, payload) {
-    const { data, error } = await sb.from('food_items').update(payload).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
+    await tcbDb.collection('fridge').doc(id).update(payload);
+    return { id, ...payload };
   },
   async deleteItem(id) {
-    const { error } = await sb.from('food_items').delete().eq('id', id);
-    if (error) throw error;
+    await tcbDb.collection('fridge').doc(id).remove();
   },
   async insertHistory(records) {
-    const { error } = await sb.from('purchase_history').insert(records);
-    if (error) throw error;
+    await Promise.all(records.map(r =>
+      tcbDb.collection('history').add({ ...r, created_at: new Date().toISOString() })
+    ));
   },
   async fetchHistory(days = 90) {
     const cutoff = addDays(todayStr(), -days);
-    const { data, error } = await sb.from('purchase_history').select('*').gte('date', cutoff).order('date', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    const { data } = await tcbDb.collection('history')
+      .where({ date: tcbDb.command.gte(cutoff) })
+      .orderBy('date', 'desc').limit(500).get();
+    return (data || []).map(doc => ({
+      name:     doc.name,
+      category: doc.category,
+      date:     doc.date,
+      price:    doc.price || 0,
+    }));
   },
 };
 
@@ -113,7 +207,7 @@ function renderCard(item) {
   const f = getFreshness(item.expiry_date);
   const qty = item.quantity ? `<span class="card-qty">${escHtml(item.quantity)}</span>` : '';
   return `<div class="item-card ${f.status}" data-id="${item.id}">
-    <span class="card-emoji">${catIcon(item.category)}</span>
+    <span class="card-emoji">${getItemEmoji(item.name, item.category)}</span>
     <div class="card-name">${escHtml(item.name)}</div>
     <div class="card-cat">${escHtml(item.category)}</div>
     <div class="card-foot">
@@ -263,7 +357,7 @@ function openEditForm(id) {
 async function handleFormSubmit(e) {
   e.preventDefault();
   const saveBtn = document.getElementById('btn-save-item');
-  saveBtn.textContent = '保存中...'; saveBtn.disabled = true;
+  saveBtn.textContent = '保存'; saveBtn.disabled = true;
 
   const payload = buildPayload({
     name:          document.getElementById('input-name').value,
@@ -273,29 +367,42 @@ async function handleFormSubmit(e) {
     expiry_date:   document.getElementById('input-expiry-date').value,
     price:         document.getElementById('input-price').value,
   });
-  if (!payload.name) { saveBtn.textContent = '保存'; saveBtn.disabled = false; return; }
+  if (!payload.name) { saveBtn.disabled = false; return; }
 
-  try {
-    if (state.editingId) {
-      const updated = await db.updateItem(state.editingId, payload);
-      const idx = state.items.findIndex(i => i.id === state.editingId);
-      if (idx >= 0) state.items[idx] = updated;
-      state.recipes = null;
-      showToast('已更新 ✅');
-    } else {
-      const saved = await db.insertItem(payload);
-      state.items.unshift(saved);
-      state.recipes = null;
-      db.insertHistory([{ name: saved.name, category: saved.category, date: saved.purchase_date, price: saved.price }])
-        .catch(console.error);
-      showToast('已添加 ✅');
-    }
+  state.recipes = null;
+
+  if (state.editingId) {
+    const editId = state.editingId;
+    const idx = state.items.findIndex(i => i.id === editId);
+    if (idx >= 0) state.items[idx] = { ...state.items[idx], ...payload };
     closeSheet('sheet-item');
     renderInventory();
-  } catch (err) {
-    showToast('保存失败：' + err.message);
-  } finally {
-    saveBtn.textContent = '保存'; saveBtn.disabled = false;
+    showToast('已更新 ✅');
+    saveBtn.disabled = false;
+    db.updateItem(editId, payload).then(updated => {
+      const i = state.items.findIndex(x => x.id === editId);
+      if (i >= 0) state.items[i] = updated;
+      renderInventory();
+    }).catch(err => showToast('同步失败：' + err.message));
+  } else {
+    const tempId = 'tmp-' + Date.now();
+    const optimistic = { id: tempId, ...payload, created_at: new Date().toISOString() };
+    state.items.unshift(optimistic);
+    closeSheet('sheet-item');
+    renderInventory();
+    showToast('已添加 ✅');
+    saveBtn.disabled = false;
+    db.insertItem(payload).then(saved => {
+      const i = state.items.findIndex(x => x.id === tempId);
+      if (i >= 0) state.items[i] = saved;
+      renderInventory();
+      db.insertHistory([{ name: saved.name, category: saved.category, date: saved.purchase_date, price: saved.price }])
+        .catch(console.error);
+    }).catch(err => {
+      state.items = state.items.filter(x => x.id !== tempId);
+      renderInventory();
+      showToast('保存失败：' + err.message);
+    });
   }
 }
 
@@ -387,9 +494,8 @@ async function confirmImport() {
       quantity: it.quantity || '', price: it.price || 0,
       purchase_date: todayStr(),
     }));
-    // Insert all items in batch
-    const { data: inserted, error } = await sb.from('food_items').insert(payloads).select();
-    if (error) throw error;
+    // Insert all items one by one via db layer
+    const inserted = await Promise.all(payloads.map(p => db.insertItem(p)));
     state.items.unshift(...inserted);
     state.recipes = null;
 
@@ -410,33 +516,19 @@ async function confirmImport() {
 
 // ══ SiliconFlow OCR (vision) ══════════════════════════
 async function callOCR(base64, mime) {
-  const { baseUrl, visionModel } = CONFIG.ai;
-  const resp = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${aiKey()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: visionModel,
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-          { type: 'text', text: `解析超市小票，提取所有食品和日用杂货商品，返回 JSON 数组。
-字段：name（中文原文）、price（数字）、quantity（如"1个"）、category（蔬菜/水果/肉类/乳制品/调料/主食/其他）。
-只返回 JSON 数组，无其他文字；排除非商品（购物袋、积分等）；非小票图片返回 []。` },
-        ],
-      }],
-    }),
+  const visionModel = CONFIG?.ai?.visionModel || 'Qwen/Qwen3-VL-8B-Instruct';
+  const data = await sfFetch('chat/completions', {
+    model: visionModel,
+    max_tokens: 2048,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: `解析超市小票，提取所有食品和日用杂货商品，返回 JSON 数组。字段：name（中文原文）、price（数字）、quantity（如"1个"）、category（蔬菜/水果/肉类/乳制品/调料/主食/其他）。只返回 JSON 数组，无其他文字；排除非商品（购物袋、积分等）；非小票图片返回 []。` },
+        { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+      ],
+    }],
   });
-  if (!resp.ok) {
-    let msg = `API ${resp.status}`;
-    try { const e = await resp.json(); msg = e.error?.message || msg; } catch {}
-    throw new Error(msg);
-  }
-  return parseJsonArray((await resp.json()).choices?.[0]?.message?.content || '');
+  return parseJsonArray(data.choices?.[0]?.message?.content || '');
 }
 
 // ══ Recipe Recommendations ════════════════════════════
@@ -631,42 +723,66 @@ function renderShoppingList(list) {
 }
 
 // ══ Shared SiliconFlow Chat ═════════════════════════════
-async function callAIChat(prompt) {
-  const { baseUrl, textModel } = CONFIG.ai;
-  const resp = await fetch(`${baseUrl}/chat/completions`, {
+async function sfFetch(endpoint, body) {
+  const { baseUrl } = CONFIG.ai;
+  const resp = await fetch(`${baseUrl}/${endpoint}`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${aiKey()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: textModel,
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    headers: { 'Authorization': `Bearer ${aiKey()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
   if (!resp.ok) {
     let msg = `API ${resp.status}`;
     try { const e = await resp.json(); msg = e.error?.message || msg; } catch {}
     throw new Error(msg);
   }
-  return parseJsonArray((await resp.json()).choices?.[0]?.message?.content || '');
+  return resp.json();
+}
+
+async function callAIChat(prompt) {
+  const textModel = CONFIG?.ai?.textModel || 'Qwen/Qwen2.5-72B-Instruct';
+  const data = await sfFetch('chat/completions', {
+    model: textModel,
+    max_tokens: 4096,
+    temperature: 0.3,
+    extra_body: { enable_thinking: false },
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return parseJsonArray(data.choices?.[0]?.message?.content || '');
 }
 
 function parseJsonArray(text) {
-  text = text.trim();
+  // Strip Qwen3 <think>...</think> reasoning blocks
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  // Strip markdown code fences ```json ... ```
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
   try { const r = JSON.parse(text); if (Array.isArray(r)) return r; } catch {}
+  // Last resort: extract first [...] block
   const m = text.match(/\[[\s\S]*\]/);
   if (m) { try { const r = JSON.parse(m[0]); if (Array.isArray(r)) return r; } catch {} }
-  throw new Error('无法解析 AI 返回结果，请重试');
+  console.error('AI raw response:', text);
+  throw new Error('AI 返回格式有误，请重试');
 }
 
-// ══ File → Base64 ══════════════════════════════════════
-function readFileAsBase64(file) {
+// ══ File → Base64 (with resize) ═══════════════════════
+function readFileAsBase64(file, maxPx = 1024) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve({ base64: reader.result.split(',')[1], mime: file.type || 'image/jpeg' });
     reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ base64: dataUrl.split(',')[1], mime: 'image/jpeg' });
+      };
+      img.src = reader.result;
+    };
     reader.readAsDataURL(file);
   });
 }
@@ -686,13 +802,11 @@ function showToast(msg) {
 // ══ Config Check ══════════════════════════════════════
 function isConfigured() {
   return typeof CONFIG !== 'undefined'
-    && CONFIG.supabase?.url
-    && !CONFIG.supabase.url.includes('YOUR_')
-    && CONFIG.supabase?.anonKey
-    && !CONFIG.supabase.anonKey.includes('YOUR_');
+    && CONFIG.cloudbase?.envId
+    && !CONFIG.cloudbase.envId.includes('YOUR_');
 }
-function aiKey()    { return CONFIG?.ai?.apiKey  || ''; }
-function aiReady()  { return aiKey() && !aiKey().includes('YOUR_'); }
+function aiKey()   { return CONFIG?.ai?.apiKey || ''; }
+function aiReady() { return aiKey() && !aiKey().includes('YOUR_'); }
 
 // ══ Init ══════════════════════════════════════════════
 async function init() {
@@ -702,8 +816,26 @@ async function init() {
     return;
   }
 
-  // Init Supabase
-  sb = window.supabase.createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+  // Init CloudBase
+  try {
+    console.log('[TCB] init env:', CONFIG.cloudbase.envId);
+    const app = cloudbase.init({ env: CONFIG.cloudbase.envId });
+    console.log('[TCB] auth start');
+    const auth = app.auth({ persistence: 'local' });
+    const loginState = await auth.getLoginState();
+    if (!loginState) {
+      await auth.anonymousAuthProvider().signIn();
+    }
+    console.log('[TCB] auth done, init db');
+    tcbDb = app.database();
+    console.log('[TCB] db ready');
+  } catch (err) {
+    console.error('[TCB] init failed:', err);
+    document.getElementById('screen-loading').classList.add('hidden');
+    document.getElementById('screen-setup').classList.remove('hidden');
+    document.querySelector('.setup-desc').textContent = '初始化失败：' + (err.message || err.code || JSON.stringify(err));
+    return;
+  }
 
   // Show main screen
   document.getElementById('screen-loading').classList.add('hidden');

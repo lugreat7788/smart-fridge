@@ -1,0 +1,25 @@
+{
+  "name": "smart-fridge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lugreat7788/smart-fridge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lugreat7788/smart-fridge/issues"
+  },
+  "homepage": "https://github.com/lugreat7788/smart-fridge#readme",
+  "devDependencies": {
+    "@cloudbase/js-sdk": "^3.4.6",
+    "esbuild": "^0.28.1"
+  }
+}

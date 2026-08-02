@@ -1,2 +1,6 @@
 .DS_Store
-config.js
+/config.js
+.env
+.env.local
+.vercel
+node_modules/
